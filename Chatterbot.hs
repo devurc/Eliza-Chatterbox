@@ -66,7 +66,7 @@ present :: Phrase -> String
 present = unwords
 
 prepare :: String -> Phrase
-prepare = reduce . words . map toLower . filter (not . flip elem ".,:;*!#%&|") 
+prepare = reduce . words . map toLower . filter (not . flip elem ".,:;*!#%&|")
 
 rulesCompile :: [(String, [String])] -> BotBrain
 {- TO BE WRITTEN -}
@@ -106,7 +106,10 @@ reductionsApply _ = id
 -- Replaces a wildcard in a list with the list given as the third argument
 substitute :: Eq a => a -> [a] -> [a] -> [a]
 substitute _ _ _ = []
-{- TO BE WRITTEN -}
+substitute _ [] _ = []
+substitute wildcard (t:tail) s
+ | wildcard == t    = (s) ++ (substitute wildcard tail s)
+ | otherwise = t: (substitute wildcard tail s)
 
 
 -- Tries to match two lists. If they match, the result consists of the sublist
@@ -153,5 +156,3 @@ transformationApply _ _ _ _ = Nothing
 transformationsApply :: Eq a => a -> ([a] -> [a]) -> [([a], [a])] -> [a] -> Maybe [a]
 transformationsApply _ _ _ _ = Nothing
 {- TO BE WRITTEN -}
-
-
