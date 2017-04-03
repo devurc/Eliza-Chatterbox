@@ -12,8 +12,13 @@ module Main where
     singleWildcardMatch :: Eq a => [a] -> [a] -> Maybe [a]
     singleWildcardMatch (wc:ps) (x:xs)
         -- Remove all instances of wc, don't think its necessary
-        | ps == [x | x <- xs, x /= wc] = Just [x]
-        -- | ps == xs = Just [x]
+        -- | ps == [x | x <- xs, x /= wc] = Just [x]
+        -- Case when the list tails match exactly
+        | ps == xs = Just [x]
+        -- Case when the first element of the lists match
+        -- and the lengths match (e.g. match '*' "*X*" "aXb")
+        -- returns Just "a"
+        | ps !! 0 == xs !! 0 && length ps == length xs = Just [x]
         | otherwise = Nothing
 
     -- TO DO -- 
