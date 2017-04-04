@@ -1,5 +1,5 @@
 module Main where
-  
+
     import Test.HUnit
     import Debug.Trace
 
@@ -12,20 +12,23 @@ module Main where
     singleWildcardMatch :: Eq a => [a] -> [a] -> Maybe [a]
     singleWildcardMatch (wc:ps) (x:xs)
         -- Remove all instances of wc, don't think its necessary
-        -- | ps == [x | x <- xs, x /= wc] = Just [x]
-        -- Case when the list tails match exactly
-        | ps == xs = Just [x]
-        -- Case when the first element of the lists match
-        -- and the lengths match (e.g. match '*' "*X*" "aXb")
-        -- returns Just "a"
-        | ps !! 0 == xs !! 0 && length ps == length xs = Just [x]
+        | ps == [x | x <- xs, x /= wc] = Just [x]
+        -- | ps == xs = Just [x]
         | otherwise = Nothing
 
-    -- TO DO -- 
-    -- longerWildcardMatch :: Eq a => [a] -> [a] -> Maybe [a]
-    -- longerWildcardMatch (wc:ps) (x:xs)
-    --     | ps == xs  = Nothing
-    --     | otherwise = Just x : longerWildcardMatch ps xs
+    -- TO DO --
+    longerWildcardMatch :: Eq a => [a] -> [a] -> Maybe [a]
+    longerWildcardMatch (wc:ps) (x:xs)
+         -- If the two list tails are the same length that means that
+         -- the wildcard is singular. Therefore this function should
+         -- return nothing
+         | ps == xs  = Nothing
+         -- Else just keep collecting all the letters that come
+         -- before ps e.g we are extracting 'dobe' from 'dobedo' where
+         -- wc:ps == *do. HOWEVER when we are left with 'edo' to deal
+         -- with, it will fall to the first case above and return
+         -- Nothing.
+         | otherwise = map (x :) longerWildcardMatch (wc:ps) xs
 
 
     match :: Eq a => a -> [a] -> [a] -> Maybe [a]
@@ -39,7 +42,7 @@ module Main where
         | not $ wildcard `elem` (p:ps) = Nothing
         -- Case when wildcard is not the first element of p
         -- and head elemnts are equal
-        | wildcard /= p && p == s      = match wildcard ps ss 
+        | wildcard /= p && p == s      = match wildcard ps ss
         -- Case when the first element is the wildcard
         | wildcard == p                = singleWildcardMatch (p:ps) (s:ss)
         | otherwise                    = Nothing
@@ -52,7 +55,7 @@ module Main where
     matchTest =
         test [
             -- Empty list edge cases
-            match '*' "" "" ~?= Just [],              -- 0 
+            match '*' "" "" ~?= Just [],              -- 0
             match '*' "abba" "" ~?= Nothing,          -- 1
             match '*' "" "abba" ~?= Nothing,          -- 2
             -- singleWildCardMatch cases
@@ -61,7 +64,7 @@ module Main where
             match '*' "*" "a" ~?= Just "a",           -- 5
             match '*' "*X*" "aXb" ~?= Just "a",       -- 6 (FAILING)
             match 'x' "2*x+3" "2*7+3" ~?= Just "7",   -- 7
-            match '*' "frodo" "gandalf" ~?= Nothing,  -- 8 
+            match '*' "frodo" "gandalf" ~?= Nothing,  -- 8
             match 2 [1,3..5] [1,3..5] ~?= Just []     -- 9
             -- longerWildCardMatch cases
             -- match '*' "* and *" "you and me" ~?= Just "you",
@@ -74,7 +77,7 @@ module Main where
 
     main = runTestTT $
         test [
-            "substitute" ~: Main.substituteTest, -- ALL OK -- 
+            "substitute" ~: Main.substituteTest, -- ALL OK --
             "match" ~: Main.matchTest
         -- "transformationApply" ~: transformationApplyTest,
         -- "transformationsApply" ~: transformationsApplyTest,
