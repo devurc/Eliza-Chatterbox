@@ -62,8 +62,8 @@ module Main where
     -- The second parameter to this function is another function which is used 
     -- to transform the result of the match before the substitution is made. 
     -- Currently does not use the second function argument
-    transformationApply wildcard f orig present
-        | match wildcard first orig /= Nothing = Just (substitute wildcard second matchResult)
+    transformationApply wildcard f orig present 
+        | match wildcard first orig /= Nothing = Just (substitute wildcard second $ f matchResult)
         | otherwise = Nothing
         where first = fst(present)
               second = snd(present)

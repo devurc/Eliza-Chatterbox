@@ -2,6 +2,7 @@ module Chatterbot where
 import Utilities
 import System.Random
 import Data.Char
+import Data.Maybe
 
 chatterbot :: String -> [(String, [String])] -> IO ()
 chatterbot botName botRules = do
@@ -34,8 +35,9 @@ rulesApply :: [PhrasePair] -> Phrase -> Phrase
 rulesApply _ = id
 
 reflect :: Phrase -> Phrase
-{- TO BE WRITTEN -}
-reflect = id
+reflect (s:slist) = 
+  [ if result /= [] then snd . head $ result else s | s<-(s:slist),
+  let result = filter((==s).fst) reflections ]
 
 reflections =
   [ ("am",     "are"),
@@ -114,23 +116,46 @@ substitute wildcard (t:tail) s
 -- Tries to match two lists. If they match, the result consists of the sublist
 -- bound to the wildcard in the pattern list.
 match :: Eq a => a -> [a] -> [a] -> Maybe [a]
-match _[]_  = Nothing
-match _ _[] = Nothing
--- match wildcard (p:ps) (s:ss)
-  -- | wildcard /= p 
-  -- | wildcard == p = 
-  -- | otherwise ... 
+match _ [][] = Just []
+match _ [] _ = Nothing
+match _ _ [] = Nothing
+match wildcard (p:ps) (s:ss)
+  -- Case when lists are equal
+  | (p:ps) == (s:ss)                    = Just []
+  -- Case when wildcard is not in pattern (p:ps)
+  | not $ wildcard `elem` (p:ps)        = Nothing
+  -- When (p:ps) consists of only the wildcard
+  | wildcard == p && length (p:ps) == 1 = Just (s:ss)
+  -- Case with multiple wildcards 
+  | head ps == s && ps /= ss && length ps == length ss = Just []
+  -- Case when wildcard is not the first element of p
+  -- and head elemnts are equal
+  | wildcard /= p && p == s            = match wildcard ps ss
+  -- If wildcard is the first element of pattern
+  | wildcard == p                      = orElse (singleWildcardMatch (p:ps) (s:ss))
+                                          (longerWildcardMatch (p:ps) (s:ss))
+  | otherwise                          = Nothing
+
 
 
 -- Helper function to match
 singleWildcardMatch, longerWildcardMatch :: Eq a => [a] -> [a] -> Maybe [a]
 singleWildcardMatch (wc:ps) (x:xs)
-  | ps == xs = Just x
-  | otherwise = Nothing
+  -- Remove all instances of wc, don't think its necessary
+  | ps == [x | x <- xs, x /= wc]                 = Just [x]
+  -- | ps == xs = Just [x]
+  -- Case when the first element of the lists match
+  -- and the lengths match 
+  | length ps == length xs && ps !! 0 == xs !! 0 = Just [x]
+  | otherwise                                    = Nothing
 
-{- TO BE WRITTEN -}
-longerWildcardMatch (wc:ps) (x:xs) = Nothing
-{- TO BE WRITTEN -}
+
+longerWildcardMatch (wc:ps) (x:xs)
+  -- If the two list tails are the same length that means that
+  -- the wildcard is singular.
+  | ps == xs  = Nothing
+  -- Else just keep collecting all the letters that come before ps
+  | otherwise = mmap (x:) $ match wc (wc:ps) xs
 
 
 
@@ -155,11 +180,24 @@ matchCheck = matchTest == Just testSubstitutions
 
 -- Applying a single pattern
 transformationApply :: Eq a => a -> ([a] -> [a]) -> [a] -> ([a], [a]) -> Maybe [a]
-transformationApply _ _ _ _ = Nothing
-{- TO BE WRITTEN -}
+transformationApply _ _ [] _       = Nothing
+transformationApply _ _ _ ([],[])  = Nothing
+-- The second parameter to this function is another function which is used 
+-- to transform the result of the match before the substitution is made. 
+-- Currently does not use the second function argument
+transformationApply wildcard f orig present 
+  | justResult /= Nothing = Just (substitute wildcard second $ f matchResult)
+  | otherwise = Nothing
+  where first = fst(present)
+        second = snd(present)
+        justResult = match wildcard first orig
+        matchResult = fromJust(justResult)
 
 
 -- Applying a list of patterns until one succeeds
 transformationsApply :: Eq a => a -> ([a] -> [a]) -> [([a], [a])] -> [a] -> Maybe [a]
-transformationsApply _ _ _ _ = Nothing
-{- TO BE WRITTEN -}
+transformationsApply _ _ [] _ = Nothing
+transformationsApply _ _ _ [] = Nothing
+transformationsApply wildcard f (pres:plist) orig =
+  orElse (transformationApply wildcard f orig pres)
+  (transformationsApply wildcard f plist orig) 
