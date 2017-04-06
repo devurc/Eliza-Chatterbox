@@ -3,73 +3,80 @@ module Main where
     import Test.HUnit
     import Debug.Trace
     import Utilities
+    import Data.Maybe
 
     substitute :: Eq a => a -> [a] -> [a] -> [a]
     substitute _ [] _ = []
     substitute wildcard (t:tail) s
-        | wildcard == t    = (s) ++ (substitute wildcard tail s)
+        | wildcard == t = (s) ++ (substitute wildcard tail s)
         | otherwise = t: (substitute wildcard tail s)
 
     singleWildcardMatch :: Eq a => [a] -> [a] -> Maybe [a]
     singleWildcardMatch (wc:ps) (x:xs)
         -- Remove all instances of wc, don't think its necessary
-        | ps == [x | x <- xs, x /= wc] = Just [x]
+        | ps == [x | x <- xs, x /= wc]                 = Just [x]
         -- | ps == xs = Just [x]
         -- Case when the first element of the lists match
-        -- and the lengths match (e.g. match '*' "*X*" "aXb")
-        -- returns Just "a"
+        -- and the lengths match 
         | length ps == length xs && ps !! 0 == xs !! 0 = Just [x]
-        | otherwise = Nothing
+        | otherwise                                    = Nothing
 
-    -- TO DO --
-    longerWildcardMatch :: (Show a, Eq a) => [a] -> [a] -> Maybe [a]
+    longerWildcardMatch :: Eq a => [a] -> [a] -> Maybe [a]
     longerWildcardMatch (wc:ps) (x:xs)
          -- If the two list tails are the same length that means that
-         -- the wildcard is singular. Therefore this function should
-         -- return nothing
+         -- the wildcard is singular.
          | ps == xs  = Nothing
-         -- Else just keep collecting all the letters that come
-         -- before ps e.g we are extracting 'dobe' from 'dobedo' where
-         -- wc:ps == *do. 
-         | otherwise = 
-            (   
-                trace "before call: " 
-                traceShow xs
-                mmap (x:) $ match wc (wc:ps) xs
-            )
+         -- Else just keep collecting all the letters that come before ps
+         | otherwise = mmap (x:) $ match wc (wc:ps) xs
 
-    match :: (Show a, Eq a) => a -> [a] -> [a] -> Maybe [a]
-    match _[][] = Just []
-    match _[]_  = Nothing
-    match _ _[] = Nothing
+    match :: Eq a => a -> [a] -> [a] -> Maybe [a]
+    match _ [][] = Just []
+    match _ [] _ = Nothing
+    match _ _ [] = Nothing
     match wildcard (p:ps) (s:ss)
         -- Case when lists are equal
-        | (p:ps) == (s:ss)             = (
-            trace "1st"
-            Just [])
+        | (p:ps) == (s:ss)                    = Just []
         -- Case when wildcard is not in pattern (p:ps)
-        | not $ wildcard `elem` (p:ps) = (
-            trace "2nd"
-            Nothing)
+        | not $ wildcard `elem` (p:ps)        = Nothing
         -- When (p:ps) consists of only the wildcard
         | wildcard == p && length (p:ps) == 1 = Just (s:ss)
         -- Case with multiple wildcards 
-        | head ps == s && ps /= ss && length ps == length ss     = (
-            trace "3rd"
-            traceShow ps
-            traceShow ss
-            Just [])
+        | head ps == s && ps /= ss && length ps == length ss = Just []
         -- Case when wildcard is not the first element of p
         -- and head elemnts are equal
-        | wildcard /= p && p == s      = (
-            trace "4th"
-            match wildcard ps ss
-            )
-        -- Case when the first element is the wildcard
-        | wildcard == p                = if (singleWildcardMatch (p:ps) (s:ss) == Nothing)
-                                            then (longerWildcardMatch (p:ps) (s:ss))
-                                            else (singleWildcardMatch (p:ps) (s:ss))
-        | otherwise                    = Nothing
+        | wildcard /= p && p == s            = match wildcard ps ss
+        -- If wildcard is the first element of pattern
+        | wildcard == p                      = orElse (singleWildcardMatch (p:ps) (s:ss))
+                                                (longerWildcardMatch (p:ps) (s:ss))
+        | otherwise                          = Nothing
+
+
+    -------------------------------------------------------
+    -- Applying patterns
+    --------------------------------------------------------
+
+    -- Applying a single pattern
+    transformationApply :: Eq a => a -> ([a] -> [a]) -> [a] -> ([a], [a]) -> Maybe [a]
+    transformationApply _ _ [] _       = Nothing
+    transformationApply _ _ _ ([],[])  = Nothing
+    -- The second parameter to this function is another function which is used 
+    -- to transform the result of the match before the substitution is made. 
+    -- Currently does not use the second function argument
+    transformationApply wildcard f orig present
+        | match wildcard first orig /= Nothing = Just (substitute wildcard second matchResult)
+        | otherwise = Nothing
+        where first = fst(present)
+              second = snd(present)
+              matchResult = fromJust(match wildcard first orig)
+
+    -- Applying a list of patterns until one succeeds
+    transformationsApply :: Eq a => a -> ([a] -> [a]) -> [([a], [a])] -> [a] -> Maybe [a]
+    transformationsApply _ _ [] _ = Nothing
+    transformationsApply _ _ _ [] = Nothing
+    transformationsApply wildcard f (pres:plist) orig =
+        orElse (transformationApply wildcard f orig pres)
+            (transformationsApply wildcard f plist orig) 
+
 
     substituteTest =
         test [
@@ -99,12 +106,35 @@ module Main where
             ,match '*' "*X*" "aaXbb" ~?= Just "aa"
         ]
 
+    frenchPresentation = ("My name is *", "Je m'appelle *")
+  
+    transformationApplyTest =
+        test [
+            transformationApply '*' id "My name is Zacharias" frenchPresentation
+            ~?= Just "Je m'appelle Zacharias",
+            transformationApply '*' id "My shoe size is 45" frenchPresentation
+            ~?= Nothing
+        ]
+
+    swedishPresentation = ("My name is *", "Mitt namn är *")    
+    presentations = [frenchPresentation, swedishPresentation]
+
+    transformationsApplyTest =
+        test [
+            transformationsApply '*' id presentations "My name is Zacharias"
+            ~?= Just "Je m'appelle Zacharias",
+            transformationsApply '*' id (reverse presentations) "My name is Zacharias"
+            ~?= Just "Mitt namn är Zacharias",
+            transformationsApply '*' id (reverse presentations) "My shoe size is 45"
+            ~?= Nothing
+        ]
+
     main = runTestTT $
         test [
             "substitute" ~: Main.substituteTest -- ALL OK --
             ,"match" ~: Main.matchTest
-        -- "transformationApply" ~: transformationApplyTest,
-        -- "transformationsApply" ~: transformationsApplyTest,
-        -- "reflect" ~: reflectTest,
-        -- "rulesApply" ~: rulesApplyTest
+            ,"transformationApply" ~: transformationApplyTest
+            ,"transformationsApply" ~: transformationsApplyTest
+            -- ,"reflect" ~: reflectTest
+            -- "rulesApply" ~: rulesApplyTest
         ]
