@@ -31,13 +31,19 @@ stateOfMind :: BotBrain -> IO (Phrase -> Phrase)
 stateOfMind _ = return id
 
 rulesApply :: [PhrasePair] -> Phrase -> Phrase
-{- TO BE WRITTEN -}
-rulesApply _ = id
+rulesApply [] _ = []
+rulesApply _ [] = []
+rulesApply phrasePairList original
+  | result /= Nothing    = fromJust(result)
+  | otherwise            = []
+  where result = transformationsApply "*" reflect phrasePairList original
 
 reflect :: Phrase -> Phrase
+reflect [] = []
 reflect (s:slist) = 
   [ if result /= [] then snd . head $ result else s | s<-(s:slist),
   let result = filter((==s).fst) reflections ]
+
 
 reflections =
   [ ("am",     "are"),
@@ -182,9 +188,6 @@ matchCheck = matchTest == Just testSubstitutions
 transformationApply :: Eq a => a -> ([a] -> [a]) -> [a] -> ([a], [a]) -> Maybe [a]
 transformationApply _ _ [] _       = Nothing
 transformationApply _ _ _ ([],[])  = Nothing
--- The second parameter to this function is another function which is used 
--- to transform the result of the match before the substitution is made. 
--- Currently does not use the second function argument
 transformationApply wildcard f orig present 
   | justResult /= Nothing = Just (substitute wildcard second $ f matchResult)
   | otherwise = Nothing

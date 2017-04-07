@@ -74,11 +74,11 @@ module Main where
 
   main = runTestTT $
     test [
-      "substitute" ~: Main.substituteTest,
-      "match" ~: Main.matchTest,
-      "transformationApply" ~: transformationApplyTest,
-      "transformationsApply" ~: transformationsApplyTest,
-      "reflect" ~: reflectTest
-      -- ,"rulesApply" ~: rulesApplyTest
+      "substitute" ~: Main.substituteTest
+      ,"match" ~: Main.matchTest
+      ,"transformationApply" ~: transformationApplyTest
+      ,"transformationsApply" ~: transformationsApplyTest
+      ,"reflect" ~: reflectTest
+      ,"rulesApply" ~: rulesApplyTest
     ]
 
