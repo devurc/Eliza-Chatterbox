@@ -18,70 +18,27 @@ chatterbot botName botRules = do
       if (not . endOfDialog) question then botloop else return ()
 
 --------------------------------------------------------
--- A array of strings 
 type Phrase = [String]
--- A pair of arrays of strings 
 type PhrasePair = (Phrase, Phrase)
--- A list of a pair of an array of strings 
--- and a list of strings of arrays
 type BotBrain = [(Phrase, [Phrase])]
-
-
-expEliza = [("I need *",
-      ["Why do you need * ?",
-       "Would it really help you to get * ?",
-       "Are you sure you need * ?"])
-      ]
-
-usedEliza = rulesCompile expEliza
-
-[(first, second)] = usedEliza
-
-choice = pick 0.3 second
-
-arg = [(first, choice)]
-
-answer = stateOfMind usedEliza
-
-finalAnswer = rulesApply arg
-
--- answerResult = (present . answer . prepare) "I need a friend"
-
--- answerWordsResult = (present . answer . words) "I need a friend"
-
-prepareResult = (present . finalAnswer . prepare) "I need a friend"
-
-wordsResult = (present . finalAnswer . words) "I need a friend"
-
 
 --------------------------------------------------------
 stateOfMind :: BotBrain -> IO (Phrase -> Phrase)
-stateOfMind brain = 
+stateOfMind botBrain = 
   do 
     r <- randomIO :: IO Float
-    return (rulesApply $ (map . map2) (id, pick r) brain)
+    return (rulesApply $ (map . map2) (id, pick r) botBrain)
   
 
-
 rulesApply :: [PhrasePair] -> Phrase -> Phrase
-rulesApply = try . transformationsApply "*" (reflect)
-
+rulesApply phrasePair phrase =
+  concat $ transformationsApply "*" reflect phrasePair phrase
 
 
 reflect :: Phrase -> Phrase
-reflect = map $ try (flip lookup reflections)
--- reflect (s:slist) =
-  -- Recursive definition
-  -- | result /= [] = reflection : reflect slist
-  -- | otherwise    = s : reflect slist
-  -- where result = filter((==s).fst) reflections
-  --       reflection = snd . head $ result
-  -- 
-  -- List comp definition
-  -- If the word is in reflections, then replace the word with its counterpart
-  -- If not, then just place it with itself and continue on
-  -- [ if result /= [] then snd . head $ result else s | s<-(s:slist),
-  -- let result = filter((==s).fst) reflections ]
+reflect (s:slist) =
+  [ if result /= [] then snd . head $ result else s | s<-(s:slist),
+  let result = filter((==s).fst) reflections ]
 
 
 reflections =
@@ -118,11 +75,7 @@ prepare = reduce . words . map toLower . filter (not . flip elem ".,:;*!#%&|")
 rulesCompile :: [(String, [String])] -> BotBrain
 rulesCompile [] = []
 rulesCompile (x:xs) =
-  -- For each tuple, transform the first String, then
-  -- transform each String in the second list using listcomp,
-  -- then append the result to the recursive call of the tuple list tail
   ( words . map toLower $ fst x, [ words $ y | y<-(snd x) ] ) : rulesCompile xs
-
 
 
 --------------------------------------
@@ -148,9 +101,8 @@ reduce = reductionsApply reductions
 
 
 reductionsApply :: [PhrasePair] -> Phrase -> Phrase
-{- TO BE WRITTEN -}
-reductionsApply _ = id
-
+reductionsApply phrasePair = 
+  fix $ try $ transformationsApply "*" id phrasePair
 
 -------------------------------------------------------
 -- Match and substitute
@@ -191,19 +143,13 @@ match wildcard (p:ps) (s:ss)
 -- Helper function to match
 singleWildcardMatch, longerWildcardMatch :: Eq a => [a] -> [a] -> Maybe [a]
 singleWildcardMatch (wc:ps) (x:xs)
-  -- Compares the pattern tail to the string without WCs
   | ps == [x | x <- xs, x /= wc]                 = Just [x]
-  -- Case when the first element of the lists match
-  -- and the lengths match 
   | length ps == length xs && ps !! 0 == xs !! 0 = Just [x]
   | otherwise                                    = Nothing
 
 
 longerWildcardMatch (wc:ps) (x:xs)
-  -- If the two list tails are the same length that means that
-  -- the wildcard is singular.
   | ps == xs  = Nothing
-  -- Else just keep collecting all the letters that come before ps
   | otherwise = mmap (x:) $ match wc (wc:ps) xs
 
 
@@ -220,8 +166,6 @@ substituteCheck = substituteTest == testString
 
 matchTest = match '*' testPattern testString
 matchCheck = matchTest == Just testSubstitutions
-
-
 
 -------------------------------------------------------
 -- Applying patterns
